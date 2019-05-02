@@ -1,5 +1,5 @@
 require 'sinatra'
-require 'sinatra/reloader'
+require 'sinatra/reloader' if development?
 require 'sinatra/content_for'
 require 'tilt/erubis'
 require 'pry'
@@ -17,7 +17,7 @@ end
 
 helpers do
   def todos_remaining(list)
-    list[:todos].count { |todo| todo[:completed] == false }
+    list[:todos].count { |todo| !todo[:completed] }
   end
 
   def list_completed?(list)
@@ -28,6 +28,20 @@ helpers do
     if list_completed?(list)
       "complete"
     end
+  end
+
+  def sort_lists(lists, &block)
+    complete_lists, incomplete_lists = lists.partition { |list| list_completed?(list) }
+
+    incomplete_lists.each { |list| yield list, lists.index(list) }
+    complete_lists.each { |list| yield list, lists.index(list) }
+  end
+
+  def sort_todos(todos, &block)
+    complete_todos, incomplete_todos = todos.partition { |todo| todo[:completed] }
+
+    incomplete_todos.each { |todo| yield todo, todos.index(todo) }
+    complete_todos.each { |todo| yield todo, todos.index(todo) }
   end
 end
 
