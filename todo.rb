@@ -3,11 +3,16 @@ require 'sinatra/reloader' if development?
 require 'sinatra/content_for'
 require 'tilt/erubis'
 require 'pry'
+require 'rack'
 
 
 configure do
   enable :sessions
   set :session_secret, 'secret'
+end
+
+configure do
+  set :erb, :escape_html => true
 end
 
 # Sets the session before each request
@@ -43,6 +48,14 @@ helpers do
     incomplete_todos.each { |todo| yield todo, todos.index(todo) }
     complete_todos.each { |todo| yield todo, todos.index(todo) }
   end
+end
+
+def load_list(index)
+  list = session[:lists][index] if index && session[:lists][index]
+  return list if list
+
+  session[:error] = "The specified list does not exist."
+  redirect "/lists"
 end
 
 # Home page sends to list page
@@ -88,14 +101,14 @@ end
 # Display a list
 get '/lists/:id' do
   @list_id = params[:id].to_i
-  @list = session[:lists][@list_id]
+  @list = load_list(@list_id)
   erb :list, layout: :layout
 end
 
 #Edit existing todo list
 get '/lists/:id/edit' do
   @list_id = params[:id]
-  @list = session[:lists][@list_id.to_i]
+  @list = load_list(@list_id.to_i)
   erb :edit_list, layout: :layout
 end
 
@@ -118,7 +131,8 @@ end
 # Delete a list
 post "/lists/:id/delete" do
   @list_id = params[:id].to_i
-  session[:lists].delete_at(@list_id)
+  @list = load_list(@list_id)
+  @list.delete_at(@list_id)
   session[:success] = "The list has been deleted."
   redirect "/lists"
 end
@@ -132,7 +146,7 @@ end
 # Add new todo to a list
 post "/lists/:list_id/todos" do
   @list_id = params[:list_id].to_i
-  @list = session[:lists][@list_id]
+  @list = load_list(@list_id)
   text = params[:todo].strip
   error = error_for_todo(text)
   if error
@@ -148,7 +162,8 @@ end
 # Complete all todos in a list
 post "/lists/:list_id/complete_all" do
   @list_id = params[:list_id].to_i
-  @todos = session[:lists][@list_id][:todos]
+  @list = load_list(@list_id)
+  @todos = @list[:todos]
   @todos.each do |todo|
     todo[:completed] = true
   end
@@ -160,7 +175,8 @@ end
 post "/lists/:list_id/todos/:id" do
   @list_id = params[:list_id].to_i
   todo_id = params[:id].to_i
-  @todos = session[:lists][@list_id][:todos]
+  @list = load_list(@list_id)
+  @todos = @list[:todos]
   @todos[todo_id][:completed] = params[:completed] == "true" ? true : false
   session[:success] = "The list has been updated."
   redirect "/lists/#{@list_id}"
@@ -170,7 +186,8 @@ end
 post "/lists/:list_id/todos/:id/delete" do
   @list_id = params[:list_id].to_i
   todo_id = params[:id].to_i
-  session[:lists][@list_id][:todos].delete_at(todo_id)
+  @list = load_list(@list_id)
+  @list[:todos].delete_at(todo_id)
   session[:success] = "The list has been updated."
   redirect "/lists/#{@list_id}"
 end
