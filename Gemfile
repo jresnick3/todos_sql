@@ -6,6 +6,7 @@ gem 'erubis'
 gem 'pry'
 gem 'sinatra', '~>1.4.8'
 gem 'sinatra-contrib' # Additional functionality including reloader
+gem 'pg'
 
 group :production do
   gem "puma"

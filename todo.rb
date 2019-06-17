@@ -5,19 +5,12 @@ require 'tilt/erubis'
 require 'pry'
 require 'rack'
 
+require_relative "database_persistance"
 
 configure do
   enable :sessions
   set :session_secret, 'secret'
-end
-
-configure do
   set :erb, :escape_html => true
-end
-
-# Sets the session before each request
-before do
-  session[:lists] ||= []
 end
 
 helpers do
@@ -50,16 +43,18 @@ helpers do
   end
 end
 
-def find_list(lists, id)
-  lists.find { |list| list[:id] == id }
-end
-
 def load_list(list_id)
-  list = find_list(session[:lists], list_id)
+  list = @storage.find_list(list_id)
   return list if list
 
   session[:error] = "The specified list does not exist."
   redirect "/lists"
+end
+
+
+# Sets the session before each request
+before do
+  @storage = DatabasePersistance.new(logger)
 end
 
 # Home page sends to list page
@@ -69,7 +64,7 @@ end
 
 # Renders the list of lists
 get '/lists' do
-  @lists = session[:lists]
+  @lists = @storage.all_lists
   erb :lists, layout: :layout
 end
 
@@ -82,14 +77,9 @@ end
 def error_for_list_name(name)
   if !name.size.between?(1, 101)
     'List name must be between 1 and 100 characters.'
-  elsif session[:lists].any? { |list| list[:name] == name }
+  elsif @storage.all_lists.any? { |list| list[:name] == name }
     'List name must be unique.'
   end
-end
-
-def next_list_id(lists)
-  max = lists.map { |list| list[:id] }.max || 0
-  max + 1
 end
 
 # Sends form with new list info
@@ -101,9 +91,7 @@ post '/lists' do
     session[:error] = error
     erb :new_list, layout: :layout
   else
-    lists = session[:lists]
-    id = next_list_id(lists)
-    session[:lists] << { id: id, name: list_name, todos: [] }
+    @storage.create_new_list(list_name)
     session[:success] = 'The list has been created.'
     redirect '/lists'
   end
@@ -130,13 +118,14 @@ end
 post "/lists/:id" do
   list_name = params[:list_name].strip
   @list_id = params[:id].to_i
-  error = error_for_list_name(list_name)
+  @list = load_list(@list_id)
 
+  error = error_for_list_name(list_name)
   if error
     session[:error] = error
     erb :edit_list, layout: :layout
   else
-    find_list(session[:lists], @list_id)[:name] = list_name
+    @storage.update_list_name(@list_id, list_name)
     session[:success] = 'The list has been successfully renamed.'
     redirect "/lists/#{@list_id}"
   end
@@ -145,8 +134,8 @@ end
 # Delete a list
 post "/lists/:id/delete" do
   @list_id = params[:id].to_i
-  @list = load_list(@list_id)
-  session[:lists].delete_if { |list| list[:id] == @list_id }
+
+  @storage.delete_list(@list_id)
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
     "/lists"
   else
@@ -161,11 +150,6 @@ def error_for_todo(name)
   end
 end
 
-def next_todo_id(todos)
-  max = todos.map { |todo| todo[:id] }.max || 0
-  max + 1
-end
-
 # Add new todo to a list
 post "/lists/:list_id/todos" do
   @list_id = params[:list_id].to_i
@@ -176,8 +160,7 @@ post "/lists/:list_id/todos" do
     session[:error] = error
     erb :list, layout: :layout
   else
-    id = next_todo_id(@list[:todos])
-    @list[:todos] << {id: id, name: params[:todo], completed: false}
+    @storage.add_todo(@list_id, text)
     session[:success] = "Todo has successfully been added."
     redirect "/lists/#{@list_id}"
   end
@@ -187,10 +170,7 @@ end
 post "/lists/:list_id/complete_all" do
   @list_id = params[:list_id].to_i
   @list = load_list(@list_id)
-  @todos = @list[:todos]
-  @todos.each do |todo|
-    todo[:completed] = true
-  end
+  @storage.complete_all_todos(@list_id)
   session[:success] = "All Todos have been completed."
   redirect "/lists/#{@list_id}"
 end
@@ -198,10 +178,10 @@ end
 # Check todo from list
 post "/lists/:list_id/todos/:id" do
   @list_id = params[:list_id].to_i
-  todo_id = params[:id].to_i
   @list = load_list(@list_id)
-  todo = @list[:todos].find { |todo| todo[:id] == todo_id }
-  todo[:completed] = params[:completed] == "true" ? true : false
+  todo_id = params[:id].to_i
+  is_completed = params[:completed] == "true"
+  @storage.update_todo_status(@list_id, todo_id, is_completed)
   session[:success] = "The list has been updated."
   redirect "/lists/#{@list_id}"
 end
@@ -209,9 +189,9 @@ end
 # Delete a todo from list
 post "/lists/:list_id/todos/:id/delete" do
   @list_id = params[:list_id].to_i
-  todo_id = params[:id].to_i
   @list = load_list(@list_id)
-  @list[:todos].delete_if { |todo| todo[:id] == todo_id }
+  todo_id = params[:id].to_i
+  @storage.delete_todo(@list_id, todo_id)
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
     status 204
   else
