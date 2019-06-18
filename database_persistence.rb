@@ -1,5 +1,4 @@
 require "pg"
-require "pry"
 
 class DatabasePersistence
   def initialize(logger)
@@ -81,15 +80,5 @@ class DatabasePersistence
     result.map do |tuple|
       {id: tuple["id"].to_i, name: tuple["name"], completed: tuple["completed"] == "t" }
     end
-  end
-
-  def next_list_id(lists)
-    max = lists.map { |list| list[:id] }.max || 0
-    max + 1
-  end
-
-  def next_todo_id(todos)
-    max = todos.map { |todo| todo[:id] }.max || 0
-    max + 1
   end
 end
