@@ -1,4 +1,4 @@
-require 'sinatra' 
+require 'sinatra'
 require 'sinatra/content_for'
 require 'tilt/erubis'
 require 'pry'
@@ -60,6 +60,10 @@ end
 # Sets the session before each request
 before do
   @storage = DatabasePersistence.new(logger)
+end
+
+after do
+  @storage.disconnect
 end
 
 # Home page sends to list page
