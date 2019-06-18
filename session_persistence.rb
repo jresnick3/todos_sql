@@ -1,4 +1,4 @@
-class SessionPersistance
+class SessionPersistence
   def initialize(session)
     @session = session
     @session[:lists] ||= []
