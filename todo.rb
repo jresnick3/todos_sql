@@ -62,9 +62,9 @@ before do
   @storage = DatabasePersistence.new(logger)
 end
 
-after do
-  @storage.disconnect
-end
+# after do
+#   @storage.disconnect
+# end
 
 # Home page sends to list page
 get '/' do
