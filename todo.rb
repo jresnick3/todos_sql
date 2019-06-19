@@ -19,12 +19,8 @@ configure(:development) do
 end
 
 helpers do
-  def todos_remaining(list)
-    list[:todos].count { |todo| !todo[:completed] }
-  end
-
   def list_completed?(list)
-    todos_remaining(list) == 0 && list[:todos].size > 0
+    list[:todos_remaining_count] == 0 && list[:todos_count] > 0
   end
 
   def list_class(list)
@@ -112,7 +108,7 @@ get '/lists/:id' do
   @list = load_list(id)
   @list_name = @list[:name]
   @list_id = @list[:id]
-  @todos = @list[:todos]
+  @todos = @storage.find_todos(@list_id)
   erb :list, layout: :layout
 end
 
