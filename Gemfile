@@ -4,7 +4,7 @@ ruby '2.4.1'
 
 gem 'erubis'
 gem 'pry'
-gem 'sinatra', '~>1.4.8'
+gem 'sinatra', '~>2.2.3'
 gem 'sinatra-contrib' # Additional functionality including reloader
 gem 'pg'
 
